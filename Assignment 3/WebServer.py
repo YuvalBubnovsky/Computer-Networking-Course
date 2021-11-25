@@ -17,28 +17,23 @@ while True:
         # and then parsing said string as a file name, if the file exists on the server a HTTP
         # header will be sent back to user signaling everything is ok and then the requested file
         # will be encoded and sent over to the client.
-        message = connectionSocket.recv(4096).decode()
-        print("Message received")
+        message = connectionSocket.recv(2048).decode()
         filename = message.split()[1]
-        print("Split Success")
         f = open(filename[1:])
-        print("Open Success")
-        outputdata = f.readlines()
-        print("Read Success")
+        outputdata = f.read()
         # Send one HTTP header line into socket
         connectionSocket.send("HTTP/1.1 200 OK\r\n\r\n".encode())
-        print("HTTP header sent")
         # Send the content of the requested file to the client
         for i in range(0, len(outputdata)):
             connectionSocket.send(outputdata[i].encode())
         connectionSocket.send("\r\n".encode())
         connectionSocket.close()
+        break
+
     except IOError:
         # Send response message for file not found
         connectionSocket.send("HTTP/1.1 404 Not found\r\n\r\n".encode())
-        print("Error Header success")
         connectionSocket.send("<html><head></head><body><h1>404 Not found</h1></body></html>\r\n".encode())
-        print("Not found success")
         # Close client socket
         connectionSocket.close()
         break
