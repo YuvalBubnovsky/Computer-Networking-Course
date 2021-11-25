@@ -10,8 +10,7 @@ filename = sys.argv[3]
 try:
     clientSocket = socket(AF_INET, SOCK_STREAM)
     clientSocket.connect((serverHost, serverPort))
-    # If the connection is successful, send a request
-    # the "/" is added because the WebServer splits incoming messages at index 1
+    # If the connection is successful, send a HTTP GET header line
     clientSocket.send(("/ "+filename).encode())
     response = clientSocket.recv(4096).decode()
 
