@@ -36,6 +36,8 @@ def handler(connection, addr):
 
 
 while True:
+    # Very similar to the one threaded application of a web server
+    # except here we open a new thread for each new request
     try:
         connection, addr = serverSocket.accept()
         print("Incoming Connection From: " + str(addr))
