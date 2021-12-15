@@ -1,44 +1,53 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <sys/socket.h>
+#include <sys/types.h>
+
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <stdio.h>
-#include <string.h>
+
 #include <unistd.h>
+#include <arpa/inet.h>
 
-int main(int argc, char **argv)
+#include <fcntl.h>
+
+#define PORT 6769
+#define ADDRESS "127.0.0.1"
+#define SIZE 104857600 // 1024 * 1024 * 100 = 100MB of data
+
+int main()
 {
-    char buf[256];
-    socklen_t len;
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1)
-    {
-        perror("socket");
-        return -1;
-    }
+    char *address = ADDRESS;
+    int conn_status;
 
-    len = sizeof(buf);
-    if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
-    {
-        perror("getsockopt");
-        return -1;
-    }
+    int sock, sock_recv;
+    struct sockaddr_in server_addr, recv_addr;
+    socklen_t addr_size;
+    char buffer[SIZE];
 
-    printf("Current: %s\n", buf);
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = PORT;
+    server_addr.sin_addr.s_addr = inet_addr(ADDRESS);
 
-    strcpy(buf, "reno");
-    len = strlen(buf);
-    if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, len) != 0)
+    conn_status = bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if (conn_status < 0)
     {
-        perror("setsockopt");
-        return -1;
+        printf("ERROR: Binding error!");
+        exit(1);
     }
-    len = sizeof(buf);
-    if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
+    conn_status = listen(sock, 5);
+    if (conn_status < 0)
     {
-        perror("getsockopt");
-        return -1;
+        printf("ERROR: Listen error!");
+        exit(1);
     }
-    printf("New: %s\n", buf);
-    close(sock);
-    return 0;
+    else
+    {
+        printf("Server listening..");
+    }
+    addr_size = sizeof(sock_recv);
+    sock_recv = accept(sock, (struct sockaddr *)&recv_addr, &addr_size);
 }
