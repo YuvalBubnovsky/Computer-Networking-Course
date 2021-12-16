@@ -45,6 +45,7 @@ int main()
     if (conn_status < 0)
     {
         printf("%s", "ERROR: Connection was NOT succuessful");
+        printf("\n");
         exit(1);
     }
 
@@ -52,6 +53,8 @@ int main()
     if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
     {
         perror("getsockopt");
+        printf("\n");
+
         return -1;
     }
 
@@ -64,11 +67,14 @@ int main()
         if (fp == NULL)
         {
             printf("ERROR: File read unsuccuessful");
+            printf("\n");
+
             exit(1);
         }
         send_file(fp, sock);
     }
     printf("Sent Data 5 times using cubic CC algorithm");
+    printf("\n");
 
     // Switching the CC algorithm to be Reno
     // The code bit for switching algorithms is courtesy of StackOverflow
@@ -77,12 +83,16 @@ int main()
     if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, len) != 0)
     {
         perror("setsockopt");
+        printf("\n");
+
         return -1;
     }
     len = sizeof(buf);
     if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
     {
         perror("getsockopt");
+        printf("\n");
+
         return -1;
     }
     printf("New: %s\n", buf);
@@ -94,11 +104,14 @@ int main()
         if (fp == NULL)
         {
             printf("ERROR: File read unsuccuessful");
+            printf("\n");
+
             exit(1);
         }
         send_file(fp, sock);
     }
     printf("Sent Data 5 times using reno CC algorithm");
+    printf("\n");
 
     // Closing the socket
     close(sock);
@@ -113,6 +126,8 @@ void send_file(FILE *fp, int sock)
         if (send(sock, data, sizeof(data), 0) == -1)
         {
             printf("ERROR: File send unsuccuessful");
+            printf("\n");
+
             exit(1);
         }
         bzero(data, SIZE);
