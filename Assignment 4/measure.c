@@ -28,17 +28,17 @@ int main()
     struct sockaddr_in server_addr, recv_addr;
     socklen_t addr_size;
 
-    char buffer[4096];
+    char buffer[1500];
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = PORT;
-    server_addr.sin_addr.s_addr = inet_addr(ADDRESS);
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
     conn_status = bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (conn_status < 0)
     {
-        printf("ERROR: Binding error!");
+        perror("conn_status");
         printf("\n");
 
         exit(1);
@@ -47,9 +47,8 @@ int main()
     conn_status = listen(sock, 10); // Ready to recieve 10 connections at the same time
     if (conn_status < 0)
     {
-        printf("ERROR: Listen error!");
+        perror("conn_status");
         printf("\n");
-
         exit(1);
     }
     else
@@ -61,11 +60,15 @@ int main()
     time_t firstBatchStart, firstBatchEnd;
     double averageTime;
     time(&firstBatchStart);
-    for (int i = 0; i < 5; i++)
+
+    sock_recv = accept(sock, (struct sockaddr *)&recv_addr, &addr_size);
+    if (sock_recv < 0)
     {
-        sock_recv = accept(sock, (struct sockaddr *)&recv_addr, &addr_size);
-        recv(sock, buffer, sizeof(buffer), 0);
+        perror("sock_recv");
+        exit(1);
     }
+    recv(sock, buffer, sizeof(buffer), 0);
+
     time(&firstBatchEnd);
     printf("Recieved 5 files using Cubic CC algorithm");
     printf("\n");
