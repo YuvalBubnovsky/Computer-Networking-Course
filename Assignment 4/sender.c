@@ -27,10 +27,11 @@ int main()
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(PORT);
-    if (inet_addr(ADDRESS) <= 0)
+    int rval = inet_pton(AF_INET, (const char *)ADDRESS, &server_address.sin_addr);
+    if (rval <= 0)
     {
-        perror("inet_address");
-        exit(1);
+        perror("rvel");
+        return -1;
     }
 
     // setting up buffer for CC algo switch later on
@@ -50,7 +51,7 @@ int main()
         printf("\n");
         exit(1);
     }
-    printf("Connected!");
+    printf("Connected!\n");
 
     len = sizeof(buf);
     if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
@@ -65,8 +66,6 @@ int main()
 
     // Sending the file 5 times using the Cubic CC algorithm
     fp = fopen(filename, "r");
-    fscanf(fp, "%s", buffer);
-    write(sock, buffer, 1500);
     if (fp == NULL)
     {
         perror("fopen");
@@ -74,6 +73,9 @@ int main()
 
         exit(1);
     }
+    fscanf(fp, "%c", buffer);
+    write(sock, buffer, 1500);
+
     // send_file(fp, sock);
     printf("Sent Data 1 times using cubic CC algorithm");
     printf("\n");
@@ -108,6 +110,9 @@ int main()
 
         exit(1);
     }
+    fscanf(fp, "%c", buffer);
+    write(sock, buffer, 1500);
+
     // send_file(fp, sock);
     printf("Sent Data 5 times using reno CC algorithm");
     printf("\n");
