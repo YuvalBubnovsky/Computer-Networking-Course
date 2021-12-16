@@ -15,7 +15,7 @@
 
 #define PORT 6769
 #define ADDRESS "127.0.0.1"
-#define SIZE 104857600 // 1024 * 1024 * 100 = 100MB of data
+#define SIZE 1048576 // 1024 * 1024 * 100 = 100MB of data
 
 // void send_file(FILE *fp, int sock); // declaring this function for later use, no header file needed here
 
@@ -73,8 +73,24 @@ int main()
 
         exit(1);
     }
-    fscanf(fp, "%c", buffer);
-    write(sock, buffer, 1500);
+    char *message = "Good Morning AMERICA";
+    int length123 = strlen(message) + 1;
+    int bytes_sent = send(sock, message, length123, 0);
+    if (bytes_sent <= 0)
+    {
+        perror("send");
+    }
+
+    /* while (n > 0)
+ {
+     bzero(buffer, strlen(buffer));
+     fscanf(fp, "%c", buffer);
+     n = send(sock, buffer, SIZE, 0);
+     if (n < 0)
+     {
+         perror("send");
+     }
+ }*/
 
     // send_file(fp, sock);
     printf("Sent Data 1 times using cubic CC algorithm");
@@ -102,7 +118,7 @@ int main()
     printf("New: %s\n", buf);
 
     // Sending the file 5 times using the Reno CC algorithm
-    fp = fopen(filename, "r");
+    /*fp = fopen(filename, "r");
     if (fp == NULL)
     {
         perror("fopen");
@@ -110,9 +126,11 @@ int main()
 
         exit(1);
     }
-    fscanf(fp, "%c", buffer);
-    write(sock, buffer, 1500);
-
+    for (int i = 0; i < 5; i++)
+    {
+        fscanf(fp, "%c", buffer);
+        write(sock, buffer, 1500);
+    }*/
     // send_file(fp, sock);
     printf("Sent Data 5 times using reno CC algorithm");
     printf("\n");
@@ -121,18 +139,3 @@ int main()
     close(sock);
     return 0;
 }
-
-/*void send_file(FILE *fp, int sock)
-{
-    char data[SIZE] = {0};
-    while (fgets(data, SIZE, fp) != NULL)
-    {
-        if (send(sock, data, sizeof(data), 0) == -1)
-        {
-            perror("fgets");
-            printf("\n");
-
-            exit(1);
-        }
-        bzero(data, SIZE);
-    }*/

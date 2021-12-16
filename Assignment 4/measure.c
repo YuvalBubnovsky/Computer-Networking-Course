@@ -67,7 +67,10 @@ int main()
         perror("sock_recv");
         exit(1);
     }
-    recv(sock, buffer, sizeof(buffer), 0);
+    if (recv(sock_recv, buffer, sizeof(buffer), 0) < 0)
+    {
+        perror("recv");
+    }
 
     time(&firstBatchEnd);
     printf("Recieved 5 files using Cubic CC algorithm");
