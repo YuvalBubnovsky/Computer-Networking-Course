@@ -12,11 +12,12 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include <sys/time.h>
+#include <time.h>
 
 #define PORT 6769
 #define ADDRESS "127.0.0.1"
 #define SIZE 1048576
+#define MTU 1024
 
 int main()
 {
@@ -25,8 +26,11 @@ int main()
     int sock, sock_recv;
     struct sockaddr_in server_addr;
     socklen_t length;
+    double average_time_cubic;
+    double average_time_reno;
 
     char buf[256]; // for CC algorithm change
+    char buffer[MTU];
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
@@ -70,7 +74,7 @@ int main()
         exit(1);
     }
 
-    conn_status = listen(sock, 200); // Ready to recieve 200 connections at the same time
+    /*conn_status = listen(sock, 200); // Ready to recieve 200 connections at the same time
     if (conn_status < 0)
     {
         perror("listen");
@@ -83,39 +87,42 @@ int main()
         printf("Server listening..");
         printf("\n");
     }
-
+*/
     /*
     Next block of code is setting up variables to measure time as requested in the assignment,
     We will be using the <sys/time.h> library to do all the required calculations.
     Afterwards, we will switch to Reno CC algorithm and take the same measurements.
     */
+    int e;
+    int recieved = 0;
 
-    struct timeval start_time, end_time;
-    double average_time_cubic;
-    if (1 == 1)
+    for (int i = 0; i < 5; i++)
     {
+        e = listen(sock, 2);
+        if (e < 0)
+        {
+            perror("listen");
+        }
         sock_recv = accept(sock, NULL, NULL);
-        char buffer[1500];
         if (sock_recv < 0)
         {
             perror("accept");
-            close(sock);
-            return -1;
+            exit(1);
         }
-        gettimeofday(&start_time, NULL);
-        int bytes_recv = recv(sock_recv, buffer, 1500, 0);
-        if (bytes_recv < 0)
+        int n = 0;
+        clock_t start = clock();
+        while ((n = recv(sock_recv, &buffer, sizeof(buffer), 0)) > 0)
         {
-            perror("recv");
+            recieved += n;
+            if (recieved == SIZE * 30)
+            {
+                i = 5;
+                break;
+            }
         }
-        // Recieving user data as long as there is something to recieve
-        while (bytes_recv > 0)
-        {
-            bytes_recv = recv(sock_recv, buffer, 1500, 0);
-        }
-        gettimeofday(&end_time, NULL);
-        // Time calculation function, took this function from - https://www.geeksforgeeks.org/how-to-measure-time-taken-by-a-program-in-c/
-        average_time_cubic = ((end_time.tv_sec + end_time.tv_usec) / 1e6) - ((start_time.tv_sec - start_time.tv_usec) / 1e6);
+        clock_t end = clock();
+        average_time_cubic += ((float)(end - start)) / 5000000;
+        bzero(buffer, MTU);
         close(sock_recv);
     }
 
@@ -139,35 +146,36 @@ int main()
     printf("New Congestion Control Strategy: %s\n", buf);
 
     // Same logic as above for measuring average time, this time for Reno CC algorithm
-    double average_time_reno = 0;
-    if (1 == 1)
+    for (int i = 0; i < 5; i++)
     {
-        int sock_recv = accept(sock, NULL, NULL);
-        char buffer[1500];
+        e = listen(sock, 2);
+        if (e < 0)
+        {
+            perror("listen");
+        }
+        sock_recv = accept(sock, NULL, NULL);
         if (sock_recv < 0)
         {
             perror("accept");
-            close(sock);
-            return -1;
+            exit(1);
         }
-        gettimeofday(&start_time, NULL);
-        int bytes_recv = recv(sock_recv, buffer, 1500, 0);
-        if (bytes_recv < 0)
+        int n = 0;
+        int recieved = 0;
+        clock_t start = clock();
+        while ((n = recv(sock_recv, &buffer, sizeof(buffer), 0)) > 0)
         {
-            perror("recv");
+            recieved += n;
+            if (recieved == SIZE * 30)
+            {
+                i = 5;
+                break;
+            }
         }
-        // Recieving user data as long as there is something to recieve
-        while (bytes_recv > 0)
-        {
-            bytes_recv = recv(sock_recv, buffer, 1500, 0);
-        }
-        gettimeofday(&end_time, NULL);
-        // Time calculation function, took this function from - https://www.geeksforgeeks.org/how-to-measure-time-taken-by-a-program-in-c/
-        average_time_cubic = ((end_time.tv_sec + end_time.tv_usec) / 1e6) - ((start_time.tv_sec - start_time.tv_usec) / 1e6);
+        clock_t end = clock();
+        average_time_reno += ((float)(end - start)) / 5000000;
+        bzero(buffer, MTU);
         close(sock_recv);
     }
-    average_time_cubic = average_time_cubic / 5;
-    average_time_reno = average_time_reno / 5;
     printf("=== Summery Of Average Time: ===");
     printf("Cubic CC algorithm: %f seconds\n", average_time_cubic);
     printf("Reno CC algorithm: %f seconds\n", average_time_reno);
