@@ -74,20 +74,6 @@ int main()
         exit(1);
     }
 
-    /*conn_status = listen(sock, 200); // Ready to recieve 200 connections at the same time
-    if (conn_status < 0)
-    {
-        perror("listen");
-        printf("\n");
-        close(sock);
-        exit(1);
-    }
-    else
-    {
-        printf("Server listening..");
-        printf("\n");
-    }
-*/
     /*
     Next block of code is setting up variables to measure time as requested in the assignment,
     We will be using the <sys/time.h> library to do all the required calculations.
@@ -98,7 +84,7 @@ int main()
 
     for (int i = 0; i < 5; i++)
     {
-        e = listen(sock, 2);
+        e = listen(sock, 10);
         if (e < 0)
         {
             perror("listen");
@@ -116,12 +102,11 @@ int main()
             recieved += n;
             if (recieved == SIZE * 30)
             {
-                i = 5;
                 break;
             }
         }
         clock_t end = clock();
-        average_time_cubic += ((float)(end - start)) / 5000000;
+        average_time_cubic += ((float)(end - start)) / CLOCKS_PER_SEC;
         bzero(buffer, MTU);
         close(sock_recv);
     }
@@ -148,7 +133,7 @@ int main()
     // Same logic as above for measuring average time, this time for Reno CC algorithm
     for (int i = 0; i < 5; i++)
     {
-        e = listen(sock, 2);
+        e = listen(sock, 10);
         if (e < 0)
         {
             perror("listen");
@@ -167,16 +152,15 @@ int main()
             recieved += n;
             if (recieved == SIZE * 30)
             {
-                i = 5;
                 break;
             }
         }
         clock_t end = clock();
-        average_time_reno += ((float)(end - start)) / 5000000;
+        average_time_reno += ((float)(end - start)) / CLOCKS_PER_SEC;
         bzero(buffer, MTU);
         close(sock_recv);
     }
-    printf("=== Summery Of Average Time: ===");
+    printf("=== Summery Of Average Time: ===\n");
     printf("Cubic CC algorithm: %f seconds\n", average_time_cubic);
     printf("Reno CC algorithm: %f seconds\n", average_time_reno);
     close(sock);
