@@ -16,6 +16,7 @@
 #define PORT 6769
 #define ADDRESS "127.0.0.1"
 #define SIZE 1048576 // 1024 * 1024 * 100 = 100MB of data
+#define MTU 1500
 
 // void send_file(FILE *fp, int sock); // declaring this function for later use, no header file needed here
 
@@ -41,7 +42,7 @@ int main()
     // defining file pointers
     FILE *fp;
     char *filename = "100mb.txt";
-    char buffer[1500];
+    char buffer[MTU];
 
     // connecting to server and making sure connection is succuessful
     int conn_status = connect(sock, (struct sockaddr *)&server_address, sizeof(server_address));
@@ -51,7 +52,7 @@ int main()
         printf("\n");
         exit(1);
     }
-    printf("Connected!\n");
+    printf("Connected!, status: %d\n", conn_status);
 
     len = sizeof(buf);
     if (getsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
@@ -73,24 +74,61 @@ int main()
 
         exit(1);
     }
-    char *message = "Good Morning AMERICA";
-    int length123 = strlen(message) + 1;
-    int bytes_sent = send(sock, message, length123, 0);
-    if (bytes_sent <= 0)
+
+    // converts file content to string:
+    fseek(fp, 0, SEEK_END);
+    size_t lngth = ftell(fp);
+
+    // TODO: REMOVE //////////////
+    printf("%lu bytes", lngth); ///
+    //////////////////////////////
+
+    fseek(fp, 0, SEEK_SET);
+    char *messasge = (char *)malloc(lngth + 1);
+    lngth = fread(messasge, 1, lngth, fp);
+    fclose(fp);
+    messasge[lngth] = '\0';
+    lngth += 1; // TODO: is this needed? run with and without
+    printf("\nMessasge length:%ld", sizeof(messasge));
+    printf("\nMessage is:\n%s\n", messasge);
+
+    // Start of send segment
+    long sent = 0;
+    // long messageLength = SIZE;
+    // recall socket is 'sock'
+    int packLen, j, r;
+    long i;
+    for (r = 0; r < 5; r++)
     {
-        perror("send");
+        bzero(buffer, sizeof(buffer));
+        packLen = 0;
+        for (i = 0; i < lngth; i += packLen)
+        {
+            for (; i + j < lngth && j < sizeof(buffer); j++)
+            {
+                buffer[j] = messasge[i + j];
+            }
+            packLen = strlen(buffer);
+            printf("%d\n", packLen);
+            if (packLen == 0)
+            {
+                i = lngth;
+                continue;
+                // THIS EFFECTIVELY 'BREAKS' THE LOOP!
+            }
+            sent += send(sock, buffer, packLen, 0);
+            j = 0;
+        }
+        // TODO: try to run without ////////////
+        buffer[0] = '\0';
+        buffer[MTU - 1] = '\0';
+        send(sock, buffer, packLen, 0);
+
+        printf("\n sent message %d with size %ld \n", r, sent);
+        //////////////////////////////////////
     }
 
-    /* while (n > 0)
- {
-     bzero(buffer, strlen(buffer));
-     fscanf(fp, "%c", buffer);
-     n = send(sock, buffer, SIZE, 0);
-     if (n < 0)
-     {
-         perror("send");
-     }
- }*/
+    // END of send segment
 
     // send_file(fp, sock);
     printf("Sent Data 1 times using cubic CC algorithm");
