@@ -7,12 +7,11 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-
-#include <time.h>
 
 #define PORT 6769
 #define ADDRESS "127.0.0.1"
@@ -32,6 +31,7 @@ int main()
     char buf[256]; // for CC algorithm change
     char buffer[MTU];
 
+    struct timeval start, end;
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
@@ -96,7 +96,8 @@ int main()
             exit(1);
         }
         int n = 0;
-        clock_t start = clock();
+        gettimeofday(&start, 0);
+
         while ((n = recv(sock_recv, &buffer, sizeof(buffer), 0)) > 0)
         {
             recieved += n;
@@ -105,12 +106,13 @@ int main()
                 break;
             }
         }
-        clock_t end = clock();
-        average_time_cubic += ((float)(end - start)) / CLOCKS_PER_SEC;
+        gettimeofday(&end, 0);
+        average_time_cubic += (end.tv_sec - start.tv_sec) + ((end.tv_usec - start.tv_usec) / 1e6);
+
         bzero(buffer, MTU);
         close(sock_recv);
     }
-
+    printf("Recieved message 5 times, switching CC algorithm..\n");
     // Changing CC algorithm to Reno
 
     strcpy(buf, "reno");
@@ -146,7 +148,7 @@ int main()
         }
         int n = 0;
         int recieved = 0;
-        clock_t start = clock();
+        gettimeofday(&start, 0);
         while ((n = recv(sock_recv, &buffer, sizeof(buffer), 0)) > 0)
         {
             recieved += n;
@@ -155,14 +157,15 @@ int main()
                 break;
             }
         }
-        clock_t end = clock();
-        average_time_reno += ((float)(end - start)) / CLOCKS_PER_SEC;
+        gettimeofday(&end, 0);
+        average_time_reno += (end.tv_sec - start.tv_sec) + ((end.tv_usec - start.tv_usec) / 1e6);
         bzero(buffer, MTU);
         close(sock_recv);
     }
+    printf("Recieved message 5 times using Reno, calculating average delivery time\n");
     printf("=== Summery Of Average Time: ===\n");
-    printf("Cubic CC algorithm: %f seconds\n", average_time_cubic);
-    printf("Reno CC algorithm: %f seconds\n", average_time_reno);
+    printf("Cubic CC algorithm: %f seconds\n", average_time_cubic / 5);
+    printf("Reno CC algorithm: %f seconds\n", average_time_reno / 5);
     close(sock);
     return 0;
 }

@@ -11,8 +11,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include <fcntl.h>
-
 #define PORT 6769
 #define ADDRESS "127.0.0.1"
 #define SIZE 1048576 // 1024 * 1024 * 100 = 100MB of data
@@ -40,15 +38,11 @@ int main()
 
     // defining file pointers
     FILE *fp;
-    char *filename = "100mb.txt";
+    char *filename = "1mb.txt";
     char buffer[MTU];
 
-    // Start of send segment
-    long sent = 0;
-    // long messageLength = SIZE;
     // recall socket is 'sock'
-    int packLen, j, r;
-    long i;
+    int j, r;
     size_t n;
     for (r = 1; r <= 5; r++)
     {
@@ -82,7 +76,6 @@ int main()
         {
             perror("Error: ");
         }
-        printf("Message sent \n");
         close(sock);
         fclose(fp);
     }
@@ -90,8 +83,8 @@ int main()
     // END of send segment
 
     // send_file(fp, sock);
-    printf("Sent Data 5 times using cubic CC algorithm");
-    printf("\n");
+    printf("Sent Data 5 times using cubic CC algorithm\n");
+    printf("Switching To Reno\n");
 
     // Switching the CC algorithm to be Reno
     // The code bit for switching algorithms is courtesy of StackOverflow
@@ -138,12 +131,11 @@ int main()
         {
             perror("Error: ");
         }
-        printf("Message sent \n");
         close(sock);
         fclose(fp);
     }
-    printf("Sent Data 5 times using reno CC algorithm");
-    printf("\n");
+    printf("Sent Data 5 times using reno CC algorithm\n");
+    printf("Closing..\n");
 
     // Closing the socket
     return 0;
