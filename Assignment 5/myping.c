@@ -1,192 +1,146 @@
-/* myping.c
- *
- * Copyright (c) 2000 Sean Walton and Macmillan Publishers.  Use may be in
- * whole or in part in accordance to the General Public License (GPL).
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
 
-/*****************************************************************************/
-/*** myping.c                                                              ***/
-/***                                                                       ***/
-/*** Use the ICMP protocol to request "echo" from destination.             ***/
-/*****************************************************************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
-#include <fcntl.h>
-#include <errno.h>
+#include <sys/time.h> // gettimeofday()
+#include <sys/types.h>
 #include <sys/socket.h>
-#include <resolv.h>
-#include <netdb.h>
+
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 
-#define PACKETSIZE 64
-struct packet
+#include <arpa/inet.h>
+
+#include <errno.h>
+
+// IPv4 header len without options
+#define IP4_HDRLEN 20
+
+// ICMP header len for echo req
+#define ICMP_HDRLEN 8
+
+// Checksum algo
+// Compute checksum (RFC 1071).
+unsigned short calculate_checksum(unsigned short *paddress, int len)
 {
-    struct icmphdr hdr;
-    char msg[PACKETSIZE - sizeof(struct icmphdr)];
-};
+    int nleft = len;
+    int sum = 0;
+    unsigned short *w = paddress;
+    unsigned short answer = 0;
 
-int pid = -1;
-struct protoent *proto = NULL;
+    while (nleft > 1)
+    {
+        sum += *w++;
+        nleft -= 2;
+    }
 
-/*--------------------------------------------------------------------*/
-/*--- checksum - standard 1s complement checksum                   ---*/
-/*--------------------------------------------------------------------*/
-unsigned short checksum(void *b, int len)
-{
-    unsigned short *buf = b;
-    unsigned int sum = 0;
-    unsigned short result;
+    if (nleft == 1)
+    {
+        *((unsigned char *)&answer) = *((unsigned char *)w);
+        sum += answer;
+    }
 
-    for (sum = 0; len > 1; len -= 2)
-        sum += *buf++;
-    if (len == 1)
-        sum += *(unsigned char *)buf;
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    result = ~sum;
-    return result;
+    // add back carry outs from top 16 bits to low 16 bits
+    sum = (sum >> 16) + (sum & 0xffff); // add hi 16 to low 16
+    sum += (sum >> 16);                 // add carry
+    answer = ~sum;                      // truncate to 16 bits
+
+    return answer;
 }
 
-/*--------------------------------------------------------------------*/
-/*--- display - present echo info                                  ---*/
-/*--------------------------------------------------------------------*/
-void display(void *buf, int bytes)
+#define DESTINATION_IP "172.217.16.142"
+
+int main()
 {
-    int i;
-    struct iphdr *ip = buf;
-    struct icmphdr *icmp = buf + ip->ihl * 4;
+    struct icmp icmphdr; // ICMP-header
+    char data[IP_MAXPACKET] = "This is the ping.\n";
 
-    printf("----------------\n");
-    for (i = 0; i < bytes; i++)
+    int datalen = strlen(data) + 1;
+
+    //===================
+    // ICMP header
+    //===================
+
+    // Message Type (8 bits): ICMP_ECHO_REQUEST
+    icmphdr.icmp_type = ICMP_ECHO;
+
+    // Message Code (8 bits): echo request
+    icmphdr.icmp_code = 0;
+
+    // Identifier (16 bits): some number to trace the response.
+    // It will be copied to the response packet and used to map response to the request sent earlier.
+    // Thus, it serves as a Transaction-ID when we need to make "ping"
+    icmphdr.icmp_id = 18;
+
+    // Sequence Number (16 bits): starts at 0
+    icmphdr.icmp_seq = 0;
+
+    // ICMP header checksum (16 bits): set to 0 not to include into checksum calculation
+    icmphdr.icmp_cksum = 0;
+
+    // Combine the packet
+    char packet[IP_MAXPACKET];
+
+    // First, ICMP header
+    memcpy((packet), &icmphdr, ICMP_HDRLEN);
+
+    // After ICMP header, add the ICMP data.
+    memcpy(packet + ICMP_HDRLEN, data, datalen);
+
+    // Calculate the ICMP header checksum
+    icmphdr.icmp_cksum = calculate_checksum((unsigned short *)(packet), ICMP_HDRLEN + datalen);
+    memcpy((packet), &icmphdr, ICMP_HDRLEN);
+
+    struct sockaddr_in dest_in;
+    memset(&dest_in, 0, sizeof(struct sockaddr_in));
+    dest_in.sin_family = AF_INET;
+
+    // The port is irrelant for Networking and therefore was zeroed.
+    dest_in.sin_addr.s_addr = inet_addr(DESTINATION_IP);
+
+    // Create raw socket for IP-RAW (make IP-header by yourself)
+    int sock = -1;
+    if ((sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
     {
-        if (!(i & 15))
-            printf("\nX:  ", i);
-        printf("X ", ((unsigned char *)buf)[i]);
+        fprintf(stderr, "socket() failed with error: %d", errno);
+        fprintf(stderr, "To create a raw socket, the process needs to be run by Admin/root user.\n\n");
+        return -1;
     }
-    printf("\n");
-    printf("IPv%d: hdr-size=%d pkt-size=%d protocol=%d TTL=%d src=%s ",
-           ip->version, ip->ihl * 4, ntohs(ip->tot_len), ip->protocol,
-           ip->ttl, inet_ntoa(ip->saddr));
-    printf("dst=%s\n", inet_ntoa(ip->daddr));
-    if (icmp->un.echo.id == pid)
+
+    // setting up time-taking variables
+    struct timeval start, end;
+    gettimeofday(&start, 0);
+
+    int sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *)&dest_in, sizeof(dest_in));
+    // Send the packet using sendto() for sending datagrams.
+    if (sent == -1)
     {
-        printf("ICMP: type[%d/%d] checksum[%d] id[%d] seq[%d]\n",
-               icmp->type, icmp->code, ntohs(icmp->checksum),
-               icmp->un.echo.id, icmp->un.echo.sequence);
+        fprintf(stderr, "sendto() failed with error: %d", errno);
+        return -1;
     }
-}
 
-/*--------------------------------------------------------------------*/
-/*--- listener - separate process to listen for and collect messages--*/
-/*--------------------------------------------------------------------*/
-void listener(void)
-{
-    int sd;
-    struct sockaddr_in addr;
-    unsigned char buf[1024];
+    printf("Sent PING:\n");
+    printf("ICMP Header(%d) + data(%d)\n", sent, ICMP_HDRLEN + datalen);
 
-    sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
-    if (sd < 0)
+    // Recieve the ICMP echo reply
+
+    bzero(packet, IP_MAXPACKET);
+    socklen_t length = sizeof(dest_in);
+    int recv_ping = -1;
+    while (recv_ping < 0)
     {
-        perror("socket");
-        exit(0);
+        recv_ping = recvfrom(sock, packet, sizeof(packet), 0, (struct sockaddr *)&dest_in, &length);
     }
-    for (;;)
-    {
-        int bytes, len = sizeof(addr);
+    gettimeofday(&end, 0);
+    printf("Recieved PING back!\n");
+    double microseconds = (end.tv_sec - start.tv_sec) + ((end.tv_usec - start.tv_usec));
+    double milliseconds = microseconds / 1e3;
+    printf("Time (RTT): %f (milliseconds), %f (microseconds)\n", milliseconds, microseconds);
 
-        bzero(buf, sizeof(buf));
-        bytes = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &len);
-        if (bytes > 0)
-            display(buf, bytes);
-        else
-            perror("recvfrom");
-    }
-    exit(0);
-}
-
-/*--------------------------------------------------------------------*/
-/*--- ping - Create message and send it.                           ---*/
-/*--------------------------------------------------------------------*/
-void ping(struct sockaddr_in *addr)
-{
-    const int val = 255;
-    int i, sd, cnt = 1;
-    struct packet pckt;
-    struct sockaddr_in r_addr;
-
-    sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
-    if (sd < 0)
-    {
-        perror("socket");
-        return;
-    }
-    if (setsockopt(sd, SOL_IP, IP_TTL, &val, sizeof(val)) != 0)
-        perror("Set TTL option");
-    if (fcntl(sd, F_SETFL, O_NONBLOCK) != 0)
-        perror("Request nonblocking I/O");
-    for (;;)
-    {
-        int len = sizeof(r_addr);
-
-        printf("Msg #%d\n", cnt);
-        if (recvfrom(sd, &pckt, sizeof(pckt), 0, (struct sockaddr *)&r_addr, &len) > 0)
-            printf("***Got message!***\n");
-        bzero(&pckt, sizeof(pckt));
-        pckt.hdr.type = ICMP_ECHO;
-        pckt.hdr.un.echo.id = pid;
-        for (i = 0; i < sizeof(pckt.msg) - 1; i++)
-            pckt.msg[i] = i + '0';
-        pckt.msg[i] = 0;
-        pckt.hdr.un.echo.sequence = cnt++;
-        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
-        if (sendto(sd, &pckt, sizeof(pckt), 0, (struct sockaddr *)addr, sizeof(*addr)) <= 0)
-            perror("sendto");
-        sleep(1);
-    }
-}
-
-/*--------------------------------------------------------------------*/
-/*--- main - look up host and start ping processes.                ---*/
-/*--------------------------------------------------------------------*/
-int main(int count, char *strings[])
-{
-    struct hostent *hname;
-    struct sockaddr_in addr;
-
-    if (count != 2)
-    {
-        printf("usage: %s <addr>\n", strings[0]);
-        exit(0);
-    }
-    if (count > 1)
-    {
-        pid = getpid();
-        proto = getprotobyname("ICMP");
-        hname = gethostbyname(strings[1]);
-        bzero(&addr, sizeof(addr));
-        addr.sin_family = hname->h_addrtype;
-        addr.sin_port = 0;
-        addr.sin_addr.s_addr = *(long *)hname->h_addr;
-        if (fork() == 0)
-            listener();
-        else
-            ping(&addr);
-        wait(0);
-    }
-    else
-        printf("usage: myping <hostname>\n");
+    // Close the raw socket descriptor.
+    close(sock);
     return 0;
 }
