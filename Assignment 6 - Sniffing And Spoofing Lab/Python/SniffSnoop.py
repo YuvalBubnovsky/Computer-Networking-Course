@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from scapy.all import *
 
+# Simple Scapy script to sniff ICMP packets on the web and spoof replies
 def spoof(pkt):
     # code 8 is echo, we don't care for anything else
     if pkt[ICMP].type != 8:

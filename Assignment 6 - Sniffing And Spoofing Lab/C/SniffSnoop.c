@@ -18,6 +18,7 @@
 void send_echo_reply(const struct iphdr *ip);
 void send_raw_ip_packet(struct iphdr *ip);
 
+// Loopback function for pcap
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
     struct sockaddr_in src;
@@ -48,20 +49,16 @@ void send_raw_ip_packet(struct iphdr *ip)
     struct sockaddr_in dest_info;
     int enable = 1;
 
-    // Step 1: Create a raw network socket.
+    // Creating the raw socket
     int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
-    // Step 2: Set socket option.
-    setsockopt(sock, IPPROTO_IP, IP_HDRINCL,
-               &enable, sizeof(enable));
+    // Enabling promiscous mode on the socket
+    setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &enable, sizeof(enable));
 
-    // Step 3: Provide needed information about destination.
     dest_info.sin_family = AF_INET;
     dest_info.sin_addr.s_addr = ip->daddr;
 
-    // Step 4: Send the packet out.
-    sendto(sock, ip, ntohs(ip->tot_len), 0,
-           (struct sockaddr *)&dest_info, sizeof(dest_info));
+    sendto(sock, ip, ntohs(ip->tot_len), 0, (struct sockaddr *)&dest_info, sizeof(dest_info));
     close(sock);
 }
 
@@ -70,22 +67,19 @@ void send_echo_reply(const struct iphdr *ip)
     int ip_h_len = ip->ihl * 4;
     const char buffer[512];
 
-    // make a copy from original packet to buffer (faked packet)
+    // make a copy from original packet to buffer (fake packet)
     memset((char *)buffer, 0, 512);
     memcpy((char *)buffer, ip, ntohs(ip->tot_len));
-    struct iphdr *newip = (struct iphdr *)buffer;
-    struct icmphdr *newicmp = (struct icmphdr *)(buffer + ip_h_len);
+    struct iphdr *fake_ip = (struct iphdr *)buffer;
+    struct icmphdr *fake_icmp = (struct icmphdr *)(buffer + ip_h_len);
 
-    // Construct IP: swap src and dest in faked ICMP packet
-    newip->saddr = ip->daddr;
-    newip->daddr = ip->saddr;
-    newip->ttl = 64;
+    // Swap source & destination from the recieved packet into the fake one
+    fake_ip->saddr = ip->daddr;
+    fake_ip->daddr = ip->saddr;
+    fake_ip->ttl = 64;
+    fake_icmp->type = 0; // type 0 is echo reply
 
-    // Fill in all the needed ICMP header information.
-    // ICMP Type: 8 is request, 0 is reply.
-    newicmp->type = 0;
-
-    send_raw_ip_packet(newip);
+    send_raw_ip_packet(fake_ip);
 }
 
 int main()

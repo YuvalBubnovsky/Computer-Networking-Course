@@ -5,6 +5,7 @@ import sys
 # Setting max hops to 200
 MAX_TTL = 200
 
+# Get destination to trace from the user
 dest_name = sys.argv[1]
 dest_IP = socket.gethostbyname(sys.argv[1])
 print("tracing to "+ dest_name + " [" + dest_IP + "], Max TTL : 200")

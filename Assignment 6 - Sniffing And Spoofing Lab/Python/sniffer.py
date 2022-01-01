@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from scapy.all import *
 
+# Simple Scapy scrpit to sniff packets
+# filter is currently defined to listen to a specific subnet, can be changed according to BPF
 def print_pkt(pkt):
     pkt.show()
 
